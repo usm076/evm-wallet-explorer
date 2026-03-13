@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TXN Info</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --border:    #2a2d3a;
+      --accent:    #6c63ff;
+      --accent2:   #00d4aa;
+      --text:      #e2e4ef;
+      --muted:     #7b7f96;
+      --in:        #00d4aa;
+      --out:       #ff6b6b;
+      --warn:      #f0c040;
+      --radius:    10px;
+      --mono:      'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    header {
+      max-width: 1200px;
+      margin: 0 auto 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 1.6rem; }
+    header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
+    header span { color: var(--accent); }
+
+    /* ── Search Form ── */
+    .form-card {
+      max-width: 1200px;
+      margin: 0 auto 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+    .field input, .field select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field.grow { flex: 1; min-width: 260px; }
+    .field input[type=number] { width: 90px; }
+
+    button.search-btn {
+      padding: 9px 24px;
+      background: var(--accent);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+      height: 38px;
+      align-self: flex-end;
+    }
+    button.search-btn:hover { opacity: .85; }
+    button.search-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── Error banner ── */
+    .error-banner {
+      max-width: 1200px;
+      margin: 0 auto 16px;
+      background: #2d1a1a;
+      border: 1px solid var(--out);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      color: var(--out);
+      font-size: 0.9rem;
+      display: none;
+    }
+    .error-banner.show { display: block; }
+
+    /* ── Balance card ── */
+    .balance-card {
+      max-width: 1200px;
+      margin: 0 auto 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 24px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .balance-card.show { display: flex; }
+    .balance-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+    .balance-card .value { font-size: 1.5rem; font-weight: 700; color: var(--accent2); font-family: var(--mono); }
+    .balance-card .meta { font-size: 0.8rem; color: var(--muted); font-family: var(--mono); }
+    .balance-card .chain-badge {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+    }
+
+    /* ── Stats row ── */
+    .stats-row {
+      max-width: 1200px;
+      margin: 0 auto 20px;
+      display: none;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .stats-row.show { display: flex; }
+    .stat-card {
+      flex: 1;
+      min-width: 140px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+    }
+    .stat-card .s-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 6px; }
+    .stat-card .s-value { font-size: 1.4rem; font-weight: 700; }
+    .stat-card.total .s-value  { color: var(--accent); }
+    .stat-card.in    .s-value  { color: var(--in); }
+    .stat-card.out   .s-value  { color: var(--out); }
+
+    /* ── Tabs ── */
+    .tabs-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: none;
+    }
+    .tabs-container.show { display: block; }
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+      margin-bottom: -1px;
+    }
+    .tab-btn .badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .tab-btn.incoming.active, .tab-btn.incoming:hover { color: var(--in); border-bottom-color: var(--in); }
+    .tab-btn.incoming .badge { background: rgba(0,212,170,.15); color: var(--in); }
+    .tab-btn.outgoing.active, .tab-btn.outgoing:hover { color: var(--out); border-bottom-color: var(--out); }
+    .tab-btn.outgoing .badge { background: rgba(255,107,107,.15); color: var(--out); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead tr { background: #13151f; }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:hover { background: rgba(108,99,255,.04); }
+    td { padding: 11px 14px; vertical-align: top; }
+
+    .hash-link {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .hash-link:hover { text-decoration: underline; }
+
+    .addr {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .addr.me { color: var(--text); font-weight: 600; }
+
+    .value-cell { font-family: var(--mono); font-size: 0.85rem; white-space: nowrap; }
+    .value-native { color: var(--text); }
+    .value-zero { color: var(--muted); }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-badge.success { background: rgba(0,212,170,.12); color: var(--in); }
+    .status-badge.failed  { background: rgba(255,107,107,.12); color: var(--out); }
+
+    .erc20-list { display: flex; flex-direction: column; gap: 4px; }
+    .erc20-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(108,99,255,.1);
+      border: 1px solid rgba(108,99,255,.2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.78rem;
+    }
+    .erc20-item .token-symbol { font-weight: 700; color: var(--accent); }
+    .erc20-item .token-val { font-family: var(--mono); }
+    .erc20-item .token-contract { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+
+    .err-desc {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.75rem;
+      color: var(--out);
+    }
+
+    .ts { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+
+    .empty-state {
+      padding: 48px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: none;
+      max-width: 1200px;
+      margin: 40px auto;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .spinner.show { display: block; }
+    .spinner::before {
+      content: '';
+      display: inline-block;
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+      .form-card { flex-direction: column; }
+      .field.grow, .field input[type=number] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">⛓️</span>
+  <h1>TXN <span>Info</span></h1>
+</header>
+
+<!-- Search form -->
+<div class="form-card">
+  <div class="field grow">
+    <label>Wallet Address</label>
+    <input id="address" type="text" placeholder="0x..." spellcheck="false" />
+  </div>
+  <div class="field">
+    <label>Chain</label>
+    <select id="chainId">
+      <option value="56">BNB Smart Chain (56)</option>
+      <option value="1">Ethereum (1)</option>
+      <option value="137">Polygon (137)</option>
+      <option value="42161">Arbitrum One (42161)</option>
+      <option value="10">Optimism (10)</option>
+      <option value="8453">Base (8453)</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Limit</label>
+    <input id="limit" type="number" value="50" min="1" max="500" />
+  </div>
+  <button class="search-btn" id="searchBtn" onclick="search()">Search</button>
+</div>
+
+<!-- Error -->
+<div class="error-banner" id="errorBanner"></div>
+
+<!-- Spinner -->
+<div class="spinner" id="spinner">Loading transactions…</div>
+
+<!-- Balance -->
+<div class="balance-card" id="balanceCard">
+  <div>
+    <div class="label">Native Balance</div>
+    <div class="value" id="balValue">—</div>
+    <div class="meta" id="balRaw">—</div>
+  </div>
+  <div id="chainBadge" class="chain-badge">—</div>
+</div>
+
+<!-- Stats -->
+<div class="stats-row" id="statsRow">
+  <div class="stat-card total">
+    <div class="s-label">Total Txns</div>
+    <div class="s-value" id="statTotal">0</div>
+  </div>
+  <div class="stat-card in">
+    <div class="s-label">Incoming</div>
+    <div class="s-value" id="statIn">0</div>
+  </div>
+  <div class="stat-card out">
+    <div class="s-label">Outgoing</div>
+    <div class="s-value" id="statOut">0</div>
+  </div>
+</div>
+
+<!-- Tabs + Tables -->
+<div class="tabs-container" id="tabsContainer">
+  <div class="tab-bar">
+    <button class="tab-btn incoming active" onclick="switchTab('incoming')">
+      Incoming <span class="badge" id="badgeIn">0</span>
+    </button>
+    <button class="tab-btn outgoing" onclick="switchTab('outgoing')">
+      Outgoing <span class="badge" id="badgeOut">0</span>
+    </button>
+  </div>
+
+  <div class="tab-panel active" id="panelIncoming">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tx Hash</th>
+            <th>Time</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Value</th>
+            <th>Gas Fee</th>
+            <th>Status</th>
+            <th>ERC20 Transfers</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyIn"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panelOutgoing">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tx Hash</th>
+            <th>Time</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Value</th>
+            <th>Gas Fee</th>
+            <th>Status</th>
+            <th>ERC20 Transfers</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyOut"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Explorer base URLs for tx hash links
+  const explorerUrls = {
+    56:    'https://bscscan.com/tx/',
+    1:     'https://etherscan.io/tx/',
+    137:   'https://polygonscan.com/tx/',
+    42161: 'https://arbiscan.io/tx/',
+    10:    'https://optimistic.etherscan.io/tx/',
+    8453:  'https://basescan.org/tx/',
+  };
+
+  let currentAddress = '';
+
+  function show(id)   { document.getElementById(id).classList.add('show'); }
+  function hide(id)   { document.getElementById(id).classList.remove('show'); }
+  function text(id,v) { document.getElementById(id).textContent = v; }
+
+  function setError(msg) {
+    const el = document.getElementById('errorBanner');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+  function clearError() {
+    document.getElementById('errorBanner').classList.remove('show');
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.tab-btn.${tab}`).classList.add('active');
+    document.getElementById(`panel${tab.charAt(0).toUpperCase()+tab.slice(1)}`).classList.add('active');
+  }
+
+  function shortHash(h) {
+    if (!h || h.length < 16) return h;
+    return h.slice(0, 10) + '…' + h.slice(-6);
+  }
+  function shortAddr(a) {
+    if (!a || a.length < 12) return a;
+    return a.slice(0, 6) + '…' + a.slice(-4);
+  }
+  function formatTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' })
+         + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+  }
+
+  function renderTxRows(txs, tbodyId, chainId) {
+    const tbody = document.getElementById(tbodyId);
+    tbody.innerHTML = '';
+    if (!txs || txs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state">No transactions found</div></td></tr>';
+      return;
+    }
+    const baseUrl = explorerUrls[chainId] || '#';
+    txs.forEach(tx => {
+      const tr = document.createElement('tr');
+
+      // Hash
+      const isZeroVal = tx.value === '0 ' + tx.value.split(' ')[1] || tx.valueRaw === '0';
+      const tdHash = `<td><a class="hash-link" href="${baseUrl}${tx.hash}" target="_blank" rel="noopener">${shortHash(tx.hash)}</a></td>`;
+
+      // Time
+      const tdTime = `<td class="ts">${formatTime(tx.timestamp)}</td>`;
+
+      // From / To — highlight the searched address
+      const fromMe = tx.from === currentAddress.toLowerCase();
+      const toMe   = tx.to   === currentAddress.toLowerCase();
+      const tdFrom = `<td><span class="addr${fromMe?' me':''}" title="${tx.from}">${shortAddr(tx.from)}</span></td>`;
+      const tdTo   = `<td><span class="addr${toMe?' me':''}" title="${tx.to}">${shortAddr(tx.to)}</span></td>`;
+
+      // Value
+      const valClass = tx.valueRaw === '0' ? 'value-zero' : 'value-native';
+      const tdVal = `<td class="value-cell"><span class="${valClass}">${tx.value || '—'}</span></td>`;
+
+      // Gas fee
+      const tdGas = `<td class="value-cell"><span class="value-zero">${tx.gasFee || '—'}</span></td>`;
+
+      // Status
+      const statusClass = tx.status === 'success' ? 'success' : 'failed';
+      const errHtml = tx.errorDescription ? `<span class="err-desc">${tx.errorDescription}</span>` : '';
+      const tdStatus = `<td><span class="status-badge ${statusClass}">${tx.status}</span>${errHtml}</td>`;
+
+      // ERC20
+      let erc20Html = '<td>—</td>';
+      if (tx.erc20Transfers && tx.erc20Transfers.length > 0) {
+        const items = tx.erc20Transfers.map(t =>
+          `<span class="erc20-item">
+            <span class="token-val">${t.value}</span>
+            <span class="token-symbol">${t.tokenSymbol || t.tokenName}</span>
+            <span class="token-contract" title="${t.contractAddress}">${shortAddr(t.contractAddress)}</span>
+          </span>`
+        ).join('');
+        erc20Html = `<td><div class="erc20-list">${items}</div></td>`;
+      }
+
+      tr.innerHTML = tdHash + tdTime + tdFrom + tdTo + tdVal + tdGas + tdStatus + erc20Html;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function search() {
+    const address = document.getElementById('address').value.trim();
+    const chainId = parseInt(document.getElementById('chainId').value);
+    const limit   = parseInt(document.getElementById('limit').value) || 50;
+
+    if (!address) { setError('Please enter a wallet address.'); return; }
+
+    clearError();
+    currentAddress = address.toLowerCase();
+
+    const btn = document.getElementById('searchBtn');
+    btn.disabled = true;
+
+    // Hide results, show spinner
+    hide('balanceCard');
+    hide('statsRow');
+    hide('tabsContainer');
+    show('spinner');
+
+    try {
+      // Fetch balance and transactions in parallel
+      const [balRes, txRes] = await Promise.all([
+        fetch(`/api/balance?address=${encodeURIComponent(address)}&chainId=${chainId}`),
+        fetch(`/api/transactions?address=${encodeURIComponent(address)}&chainId=${chainId}&limit=${limit}`)
+      ]);
+
+      const balData = await balRes.json();
+      const txData  = await txRes.json();
+
+      if (balData.error) { setError('Balance: ' + balData.error); }
+      if (txData.error)  { setError('Transactions: ' + txData.error); return; }
+
+      // Balance
+      if (balData.balance) {
+        text('balValue', balData.balance);
+        text('balRaw', balData.balanceRaw + ' wei');
+        text('chainBadge', balData.chainName);
+        show('balanceCard');
+      }
+
+      // Stats
+      text('statTotal', txData.total);
+      text('statIn',    txData.incoming.length);
+      text('statOut',   txData.outgoing.length);
+      text('badgeIn',   txData.incoming.length);
+      text('badgeOut',  txData.outgoing.length);
+      show('statsRow');
+
+      // Tables
+      renderTxRows(txData.incoming, 'tbodyIn',  chainId);
+      renderTxRows(txData.outgoing, 'tbodyOut', chainId);
+      show('tabsContainer');
+
+      // Default to whichever tab has results
+      if (txData.incoming.length === 0 && txData.outgoing.length > 0) {
+        switchTab('outgoing');
+      } else {
+        switchTab('incoming');
+      }
+
+    } catch (err) {
+      setError('Request failed: ' + err.message);
+    } finally {
+      hide('spinner');
+      btn.disabled = false;
+    }
+  }
+
+  // Allow pressing Enter in the address field
+  document.getElementById('address').addEventListener('keydown', e => {
+    if (e.key === 'Enter') search();
+  });
+</script>
+</body>
+</html>
